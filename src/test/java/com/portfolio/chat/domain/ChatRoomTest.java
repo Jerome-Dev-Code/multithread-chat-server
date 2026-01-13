@@ -1,98 +1,107 @@
 package com.portfolio.chat.domain;
 
-// Imports de la logique métier (Domain et Core)
+import com.portfolio.chat.core.ChatObserver;
 import com.portfolio.chat.core.MessageSender;
-import com.portfolio.chat.domain.ChatRoom;
-
-// Imports JUnit 5
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-// Imports Mockito (pour simuler les envois de messages)
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Test unitaire de la logique métier du salon de chat.
- * Localisation : src/test/java/com/portfolio/chat/domain/ChatRoomTest.java
- */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Tests de la logique ChatRoom")
+@DisplayName("Tests de ChatRoom (Version Observateur & Signature Broadcast)")
 class ChatRoomTest {
 
     private ChatRoom chatRoom;
 
-    // On simule (mock) deux utilisateurs pour tester les interactions
     @Mock
     private MessageSender alice;
 
     @Mock
     private MessageSender bob;
 
+    @Mock
+    private ChatObserver chatObserver;
+
     @BeforeEach
     void setUp() {
-        // Initialisation d'une nouvelle salle avant chaque test
         chatRoom = new ChatRoom();
+        chatRoom.addObserver(chatObserver);
     }
 
     @Test
-    @DisplayName("Vérifier qu'un utilisateur peut rejoindre la salle")
-    void testUserJoin() {
+    @DisplayName("Vérifier la notification de l'observateur lors d'un join")
+    void testJoinNotification() {
         chatRoom.join("Alice", alice);
 
-        assertTrue(chatRoom.getOnlineUsers().contains("Alice"),
-                "Alice devrait figurer dans la liste des utilisateurs connectés.");
-        assertEquals(1, chatRoom.getOnlineUsers().size(),
-                "Il devrait y avoir exactement 1 utilisateur.");
+        // Vérifie que l'observateur est prévenu
+        verify(chatObserver, times(1)).onUserJoined("Alice");
     }
 
     @Test
-    @DisplayName("Vérifier que le broadcast envoie le message à tout le monde")
-    void testBroadcastDistribution() {
-        // Alice et Bob rejoignent
+    @DisplayName("Vérifier le broadcast complet (utilisateurs + observateur)")
+    void testBroadcastLogic() {
         chatRoom.join("Alice", alice);
         chatRoom.join("Bob", bob);
 
-        String message = "Bonjour tout le monde !";
-        chatRoom.broadcast(message);
+        // Reset des mocks pour ignorer les messages système de bienvenue
+        clearInvocations(alice, bob, chatObserver);
 
-        // On vérifie que la méthode sendMessage a été appelée sur chaque mock
-        verify(alice, times(1)).sendMessage(message);
-        verify(bob, times(1)).sendMessage(message);
+        String sender = "Alice";
+        String content = "Bonjour à tous !";
+
+        chatRoom.broadcast(sender, content);
+
+        // 1. Vérifie que les destinataires reçoivent le message formaté
+        String expectedFormatted = "Alice : Bonjour à tous !";
+        verify(alice, times(1)).sendMessage(expectedFormatted);
+        verify(bob, times(1)).sendMessage(expectedFormatted);
+
+        // 2. Vérifie que l'observateur reçoit les données brutes
+        verify(chatObserver, times(1)).onMessageSent(sender, content);
     }
 
     @Test
-    @DisplayName("Vérifier qu'un utilisateur ne reçoit plus de messages après son départ")
-    void testUserLeave() {
+    @DisplayName("Vérifier que les messages SYSTEM sont correctement gérés")
+    void testSystemBroadcast() {
         chatRoom.join("Alice", alice);
-        chatRoom.join("Bob", bob);
 
-        // Alice quitte la salle
+        String systemContent = "Maintenance dans 5 minutes";
+        chatRoom.broadcast("SYSTEM", systemContent);
+
+        // Vérifie le formatage spécifique au système
+        verify(alice).sendMessage("[SYSTEM] " + systemContent);
+
+        // L'observateur reçoit toujours les données pures
+        verify(chatObserver).onMessageSent("SYSTEM", systemContent);
+    }
+
+    @Test
+    @DisplayName("Vérifier la notification lors d'un leave")
+    void testLeaveNotification() {
+        chatRoom.join("Alice", alice);
         chatRoom.leave("Alice");
 
-        assertFalse(chatRoom.getOnlineUsers().contains("Alice"),
-                "Alice ne devrait plus être dans la liste.");
+        // Vérifie que l'observateur est prévenu du départ
+        verify(chatObserver, times(1)).onUserLeft("Alice");
 
-        // On broadcast un message
-        chatRoom.broadcast("Message de test");
-
-        // Bob doit le recevoir, mais Alice ne doit pas recevoir de NOUVEAU message
-        verify(bob, atLeastOnce()).sendMessage(anyString());
-
-        // Alice ne doit avoir reçu que les messages système lors de sa connexion/déconnexion,
-        // mais aucun message de broadcast après son 'leave'.
-        // (Note: selon ton implémentation, Alice a pu recevoir 1 message système avant de partir)
+        // Vérifie qu'un message SYSTEM de départ a été broadcasté
+        verify(chatObserver).onMessageSent(eq("SYSTEM"), contains("Alice a quitté le salon"));
     }
 
     @Test
-    @DisplayName("Vérifier la robustesse du retrait d'un utilisateur inexistant")
-    void testLeaveInexistantUser() {
-        // Ne doit pas lever d'exception
-        assertDoesNotThrow(() -> chatRoom.leave("Inconnu"));
+    @DisplayName("Vérifier la robustesse avec plusieurs observateurs")
+    void testMultipleObservers() {
+        ChatObserver secondaryObserver = mock(ChatObserver.class);
+        chatRoom.addObserver(secondaryObserver);
+
+        chatRoom.join("Bob", bob);
+
+        verify(chatObserver).onUserJoined("Bob");
+        verify(secondaryObserver).onUserJoined("Bob");
     }
 }

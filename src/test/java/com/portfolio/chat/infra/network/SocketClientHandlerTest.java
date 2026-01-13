@@ -36,27 +36,40 @@ class SocketClientHandlerTest {
     }
 
     @Test
-    @DisplayName("Le handler doit demander un pseudo et rejoindre la ChatRoom")
-    void testUserJoinSequence() throws IOException {
-        // Simulation de l'entrée utilisateur : "Alice" suivi d'un message, puis fermeture
-        String simulatedInput = "Alice\nHello!\n/quit\n";
+    @DisplayName("Le handler doit appeler broadcast avec l'expéditeur et le contenu séparés")
+    void testUserMessageBroadcast() throws IOException {
+        // Simulation : L'utilisateur choisit "Alice", envoie "Salut !", puis quitte
+        String simulatedInput = "Alice\nSalut !\n/quit\n";
         ByteArrayInputStream inputStream = new ByteArrayInputStream(simulatedInput.getBytes());
         when(mockSocket.getInputStream()).thenReturn(inputStream);
 
         SocketClientHandler handler = new SocketClientHandler(mockSocket, mockChatRoom);
-
-        // On exécute le run() (dans le thread actuel pour le test)
         handler.run();
 
-        // Vérifications
-        // 1. A-t-il rejoint la salle avec le bon pseudo ?
+        // 1. Vérifie que l'utilisateur a rejoint
         verify(mockChatRoom).join(eq("Alice"), eq(handler));
 
-        // 2. A-t-il diffusé le message "Hello!" ?
-        verify(mockChatRoom).broadcast(contains("Alice : Hello!"));
+        // 2. Vérifie l'appel à broadcast avec la nouvelle signature (sender, message)
+        // C'est ici que la modification est importante
+        verify(mockChatRoom).broadcast(eq("Alice"), eq("Salut !"));
 
-        // 3. A-t-il quitté la salle à la fin ?
+        // 3. Vérifie le départ
         verify(mockChatRoom).leave(eq("Alice"));
+    }
+
+    @Test
+    @DisplayName("Le handler ne doit pas broadcaster la commande /quit")
+    void testQuitCommandHandling() throws IOException {
+        String simulatedInput = "Alice\n/quit\n";
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(simulatedInput.getBytes());
+        when(mockSocket.getInputStream()).thenReturn(inputStream);
+
+        SocketClientHandler handler = new SocketClientHandler(mockSocket, mockChatRoom);
+        handler.run();
+
+        // On vérifie que broadcast n'a jamais été appelé avec "/quit"
+        verify(mockChatRoom, never()).broadcast(anyString(), eq("/quit"));
+        verify(mockChatRoom).leave("Alice");
     }
 
     @Test

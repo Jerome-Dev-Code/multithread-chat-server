@@ -27,8 +27,10 @@ public class SocketClientHandler implements Runnable, MessageSender {
 
             String input;
             while ((input = in.readLine()) != null) {
-                if (input.equalsIgnoreCase("/quit")) break;
-                chatRoom.broadcast(username + " : " + input);
+                if (input.equalsIgnoreCase("/quit")){
+                    break;
+                }
+                chatRoom.broadcast(username, input);
             }
         } catch (IOException e) {
             System.err.println("Client Error : " + e.getMessage());
