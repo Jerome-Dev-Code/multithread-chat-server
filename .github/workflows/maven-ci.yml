@@ -1,0 +1,28 @@
+name: Multithread Server CI with Maven
+
+on:
+  push:
+    branches: [ "develop", "main" ]
+  pull_request:
+    branches: [ "develop" ] # Déclenche les tests lors du merge vers develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # Utilise une machine Linux virtuelle
+
+    steps:
+      - name: 1. Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: 2. Configurer le JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin' # Distribution stable et recommandée
+          cache: maven           # Accélère les builds futurs en cachant les dépendances
+
+      - name: 3. Exécuter les tests avec Maven
+        run: mvn test --batch-mode
+
+      - name: 4. Vérifier la compilation (Build)
+        run: mvn clean package -DskipTests # On vérifie que le .jar se génère bien
