@@ -62,8 +62,8 @@ class ChatRoomTest {
         chatRoom.broadcast(message);
 
         // On vérifie que la méthode sendMessage a été appelée sur chaque mock
-        verify(alice, times(1)).sendMessage(anyString());
-        verify(bob, times(1)).sendMessage(anyString());
+        verify(alice, times(1)).sendMessage(message);
+        verify(bob, times(1)).sendMessage(message);
     }
 
     @Test
