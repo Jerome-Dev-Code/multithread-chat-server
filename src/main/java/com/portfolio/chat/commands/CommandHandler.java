@@ -18,13 +18,23 @@ public class CommandHandler {
     }
 
     public boolean handle(String input, String username, ChatRoom room) {
-        if (input.startsWith("/")) {
-            var cmd = commands.get(input.split(" ")[0].toLowerCase());
-            if (cmd != null) {
-                cmd.accept(username, room);
-                return true;
-            }
+        // Si ce n'est pas une commande, on laisse tomber tout de suite
+        if (!input.startsWith("/")) {
+            return false;
         }
-        return false;
+
+        // C'est une tentative de commande
+        var cmd = commands.get(input.split(" ")[0].toLowerCase());
+
+        if (cmd != null) {
+            cmd.accept(username, room);
+        } else {
+            // Optionnel : On pourrait envoyer un message d'erreur privé ici
+            System.out.println("[DEBUG] Commande inconnue tentée par " + username);
+        }
+
+        // On retourne true systématiquement car le message commençait par /
+        // et ne doit donc pas être traité comme un message de chat standard.
+        return true;
     }
 }
