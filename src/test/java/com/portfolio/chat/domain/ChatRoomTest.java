@@ -84,13 +84,17 @@ class ChatRoomTest {
     @DisplayName("Vérifier la notification lors d'un leave")
     void testLeaveNotification() {
         chatRoom.join("Alice", alice);
+
+        // On nettoie les interactions liées au "join" pour y voir clair
+        clearInvocations(chatObserver);
+
         chatRoom.leave("Alice");
 
         // Vérifie que l'observateur est prévenu du départ
         verify(chatObserver, times(1)).onUserLeft("Alice");
 
         // Vérifie qu'un message SYSTEM de départ a été broadcasté
-        verify(chatObserver).onMessageSent(eq("SYSTEM"), contains("Alice a quitté le salon"));
+        verify(chatObserver).onMessageSent(eq("SYSTEM"), contains("Alice has left room."));
     }
 
     @Test

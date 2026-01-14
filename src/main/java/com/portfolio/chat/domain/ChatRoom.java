@@ -26,6 +26,10 @@ public class ChatRoom {
 
     public void leave(String name) {
         if (users.remove(name) != null) {
+            // 1. Notifier l'événement métier "Départ"
+            observers.forEach(o -> o.onUserLeft(name));
+
+            // 2. Notifier l'événement "Message" pour le chat
             broadcast("SYSTEM", name + " has left room.");
         }
     }
