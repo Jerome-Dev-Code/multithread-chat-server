@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AdminStatusServer implements ChatObserver {
     private final ChatRoom chatRoom;
     private final AtomicInteger totalMessagesServed = new AtomicInteger(0);
+    private HttpServer server;
 
     public AdminStatusServer(ChatRoom chatRoom) {
         this.chatRoom = chatRoom;
@@ -19,9 +20,9 @@ public class AdminStatusServer implements ChatObserver {
     }
 
     public int start(int port) throws IOException {
-        var server = HttpServer.create(new InetSocketAddress(port), 0);
+        this.server = HttpServer.create(new InetSocketAddress(port), 0);
 
-        server.createContext("/status", exchange -> {
+        this.server.createContext("/status", exchange -> {
             var users = chatRoom.getOnlineUsers();
             var responseString = String.format(
                     "--- Chat Admin Dashboard ---\n" +
@@ -46,10 +47,22 @@ public class AdminStatusServer implements ChatObserver {
             }
         });
 
-        server.start();
+        this.server.start();
         System.out.println("[WEB] API Admin prête sur http://localhost:" + port + "/status");
-        return server.getAddress().getPort();
+        return this.server.getAddress().getPort();
 
+    }
+
+    /**
+     * Arrête proprement le serveur HTTP.
+     */
+    public void stop() {
+        if (this.server != null) {
+            // Le paramètre '0' indique d'arrêter le serveur immédiatement
+            // sans attendre que les échanges en cours se terminent.
+            this.server.stop(0);
+            System.out.println("[WEB] Serveur API Admin arrêté.");
+        }
     }
 
     // --- Implémentation des méthodes de l'interface ChatObserver ---
