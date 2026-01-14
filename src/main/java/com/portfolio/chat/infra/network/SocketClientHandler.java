@@ -16,10 +16,18 @@ public class SocketClientHandler implements Runnable, MessageSender {
         this.chatRoom = chatRoom;
     }
 
+    // Cette méthode sera appelée au début de run()
+    // mais peut aussi être appelée manuellement dans un test.
+    public void setupStreams() throws IOException {
+        if (this.out == null) {
+            this.out = new PrintWriter(socket.getOutputStream(), true);
+        }
+    }
+
     @Override
     public void run() {
         try (var in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-            this.out = new PrintWriter(socket.getOutputStream(), true);
+            this.setupStreams();
 
             out.println("Enter nickname :");
             this.username = in.readLine();

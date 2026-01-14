@@ -90,22 +90,19 @@ class SocketClientHandlerTest {
     void testSendMessage() throws IOException {
         SocketClientHandler handler = new SocketClientHandler(mockSocket, mockChatRoom);
 
-        // On simule manuellement l'initialisation du flux de sortie (normalement fait dans run)
-        // Pour ce test précis, on peut injecter le flux via une petite modification ou simuler le run partiellement
-        // Ici, on vérifie si sendMessage écrit dans l'outputStream
+        // 2. On déclenche l'initialisation des flux manuellement
+        // Cela va lier le PrintWriter à notre outputStream mocké dans le @BeforeEach
+        // Grâce à setupStreams(), nous pouvons tester l'envoi de messages sans déclencher la boucle bloquante run().
+        // Cela permet un test unitaire rapide et isolé.
+        handler.setupStreams();
 
-        String testMessage = "Message from server";
-
-        // Note: Dans ton code actuel, 'out' est initialisé dans run().
-        // Pour tester sendMessage isolément, il faudrait que run() ait été appelé.
-
-        // Simulation rapide du cycle de vie pour initialiser le PrintWriter 'out'
-        String input = "Alice\n/quit\n";
-        when(mockSocket.getInputStream()).thenReturn(new ByteArrayInputStream(input.getBytes()));
-
-        handler.run();
+        // 3. Action
+        String testMessage = "Test message";
         handler.sendMessage(testMessage);
 
-        assertTrue(outputStream.toString().contains(testMessage));
+        // 4. Vérification
+        // On vérifie que le message est bien présent dans le flux de sortie capturé
+        String capturedOutput = outputStream.toString();
+        assertTrue(capturedOutput.contains(testMessage),"Le flux de sortie devrait contenir le message envoyé");
     }
 }
