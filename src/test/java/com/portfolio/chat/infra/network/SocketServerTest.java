@@ -40,7 +40,13 @@ class SocketServerTest {
         socketServer = new SocketServer(testPort, chatRoom);
 
         // On lance le serveur dans un thread séparé car start() est bloquant
-        CompletableFuture.runAsync(() -> socketServer.start());
+        CompletableFuture.runAsync(() -> {
+            try {
+                socketServer.start();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
 
         // On laisse un court instant au serveur pour s'initialiser
         TimeUnit.MILLISECONDS.sleep(200);
@@ -57,7 +63,13 @@ class SocketServerTest {
         socketServer = new SocketServer(5556, chatRoom);
 
         // Lancement asynchrone
-        CompletableFuture.runAsync(() -> socketServer.start());
+        CompletableFuture.runAsync(() -> {
+            try {
+                socketServer.start();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
 
         // On vérifie que l'arrêt ne provoque pas de crash
         assertDoesNotThrow(() -> {

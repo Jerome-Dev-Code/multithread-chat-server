@@ -19,20 +19,16 @@ public class SocketServer {
         this.threadPool = Executors.newCachedThreadPool();
     }
 
-    public void start() {
-        try (var serverSocket = new ServerSocket(port)) {
-            System.out.println("[TCP] Tchat server started on port " + port);
+    public void start() throws IOException{
+        var serverSocket = new ServerSocket(port);
+        System.out.println("[TCP] Tchat server started on port " + port);
 
-            while (running) {
-                var clientSocket = serverSocket.accept();
-                // Chaque client est géré dans son propre thread
-                threadPool.execute(new SocketClientHandler(clientSocket, chatRoom));
-            }
-        } catch (IOException e) {
-            System.err.println("[TCP] Server error : " + e.getMessage());
-        } finally {
-            stop();
+        while (running) {
+            var clientSocket = serverSocket.accept();
+            // Chaque client est géré dans son propre thread
+            threadPool.execute(new SocketClientHandler(clientSocket, chatRoom));
         }
+        stop();
     }
 
     public void stop() {

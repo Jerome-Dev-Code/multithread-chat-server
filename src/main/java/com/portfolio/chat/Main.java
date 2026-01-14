@@ -39,7 +39,7 @@ public class Main {
 
             chatServer.start();
         } catch (IOException e) {
-            System.err.println("Erreur fatale : " + e.getMessage());
+            System.err.println("Error : " + e.getMessage());
             System.exit(1);
         }
     }
