@@ -49,8 +49,7 @@ public class ChatRoom {
         // 3. Notification "propre" aux observateurs (ex: pour archivage en BDD ou logs)
         observers.forEach(observer -> observer.onMessageSent(sender, message));
     }
-
     public Collection<String> getOnlineUsers() {
-        return users.keySet();
+        return new ArrayList<>(users.keySet());
     }
 }

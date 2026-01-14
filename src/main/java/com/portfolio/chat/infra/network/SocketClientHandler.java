@@ -4,6 +4,7 @@ import com.portfolio.chat.core.MessageSender;
 import com.portfolio.chat.domain.ChatRoom;
 import java.io.*;
 import java.net.Socket;
+import java.util.List;
 
 public class SocketClientHandler implements Runnable, MessageSender {
     private final Socket socket;
@@ -37,8 +38,22 @@ public class SocketClientHandler implements Runnable, MessageSender {
             while ((input = in.readLine()) != null) {
                 if (input.equalsIgnoreCase("/quit")){
                     break;
+                }else if (input.equalsIgnoreCase("/list")) {
+                    // On récupère la liste des utilisateurs depuis la ChatRoom
+                    List<String> users = (List<String>) chatRoom.getOnlineUsers();
+                    if (users.isEmpty()) {
+                        sendMessage("La salle est vide.");
+                    } else {
+                        StringBuilder sb = new StringBuilder();
+                        sb.append("--- Utilisateurs en ligne (").append(users.size()).append(") ---\n");
+                        for (String user : users) {
+                            sb.append("- ").append(user).append("\n");
+                        }
+                        sendMessage(sb.toString());
+                    }
+                }else {
+                    chatRoom.broadcast(username, input);
                 }
-                chatRoom.broadcast(username, input);
             }
         } catch (IOException e) {
             System.err.println("Client Error : " + e.getMessage());
