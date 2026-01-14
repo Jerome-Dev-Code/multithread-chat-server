@@ -1,5 +1,6 @@
 package com.portfolio.chat;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import java.util.concurrent.CompletableFuture;
@@ -9,6 +10,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 @DisplayName("Smoke Test - Main")
 class MainTest {
 
+    @AfterEach
+    void tearDown() {
+        // Sécurité maximale : on force l'arrêt des serveurs après chaque test
+        // pour libérer les ports, même si le main() tourne encore en fond.
+        Main.stopServers();
+    }
     @Test
     @DisplayName("L'application doit démarrer sans conflit de ports")
     void smokeTestMainStartup() {

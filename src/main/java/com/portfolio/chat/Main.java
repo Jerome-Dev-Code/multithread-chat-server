@@ -9,7 +9,9 @@ import java.io.InputStream;
 import java.util.Properties;
 
 public class Main {
-
+    // On expose les serveurs pour permettre un arrêt externe (notamment pour les tests)
+    static SocketServer chatServer;
+    static AdminStatusServer adminServer;
     public static void main(String[] args) {
         Properties config = loadFullConfiguration();
 
@@ -27,22 +29,26 @@ public class Main {
         ChatRoom chatRoom = new ChatRoom();
         if (isVerbose) setupDebugLogging(chatRoom);
 
-        AdminStatusServer adminServer = new AdminStatusServer(chatRoom);
-        SocketServer chatServer = new SocketServer(chatPort, chatRoom);
+        adminServer = new AdminStatusServer(chatRoom);
+        chatServer = new SocketServer(chatPort, chatRoom);
 
         try {
             adminServer.start(adminPort);
 
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                chatServer.stop();
-                adminServer.stop();
-            }));
+            Runtime.getRuntime().addShutdownHook(new Thread(Main::stopServers));
 
             chatServer.start();
         } catch (IOException e) {
             System.err.println("Erreur fatale : " + e.getMessage());
             System.exit(1);
         }
+    }
+
+    // Méthode utilitaire pour l'arrêt propre
+    static void stopServers() {
+        if (chatServer != null) chatServer.stop();
+        if (adminServer != null) adminServer.stop();
+        System.out.println("=== Serveurs arrêtés proprement ===");
     }
 
     private static Properties loadFullConfiguration() {

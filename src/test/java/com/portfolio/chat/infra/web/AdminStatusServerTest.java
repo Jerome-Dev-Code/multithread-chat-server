@@ -30,6 +30,13 @@ class AdminStatusServerTest {
         realPort = adminServer.start(0);
     }
 
+    @AfterEach
+    void tearDown() {
+        if (adminServer != null) {
+            adminServer.stop();
+        }
+    }
+
     @Test
     @DisplayName("L'API doit afficher le nombre correct de messages via l'Observer")
     void testMessageCounterViaObserver() throws IOException, InterruptedException {
