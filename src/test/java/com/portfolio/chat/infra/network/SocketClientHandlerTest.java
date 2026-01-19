@@ -111,7 +111,7 @@ class SocketClientHandlerTest {
     @DisplayName("La commande /list doit gérer le cas d'une liste vide")
     void shouldHandleEmptyUserList() throws IOException {
         // GIVEN: Aucun utilisateur
-        when(this.mockChatRoom.getOnlineUsers()).thenReturn(Arrays.asList());
+        when(this.mockChatRoom.getOnlineUsers()).thenReturn(List.of());
 
         String inputData = "Alice\n/list\n/quit\n";
         when(this.mockSocket.getInputStream()).thenReturn(new ByteArrayInputStream(inputData.getBytes()));
@@ -130,7 +130,7 @@ class SocketClientHandlerTest {
 
         SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
         // Exécution (ne doit pas lever d'exception)
-        assertDoesNotThrow(() -> handler.run());
+        assertDoesNotThrow(handler::run);
 
         // Vérification : Alice a rejoint puis quitté la salle
         verify(mockChatRoom).join(eq("Alice"), any());
@@ -149,9 +149,7 @@ class SocketClientHandlerTest {
 
         SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
         // Au lieu d'appeler handler.run() directement, on vérifie qu'il explose
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            handler.run();
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class, handler::run);
 
         // On vérifie que c'est bien notre message personnalisé
         assertTrue(exception.getMessage().contains("IO_GENERAL_ERROR"));
@@ -171,7 +169,7 @@ class SocketClientHandlerTest {
         // Note: Si connected est true, elle sera remontée.
         // Si vous voulez tester le silence, il faudrait que connected soit false.
         SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
-        assertThrows(RuntimeException.class, () -> handler.run());
+        assertThrows(RuntimeException.class, handler::run);
 
         // On s'assure que close est quand même appelé
         verify(mockSocket, atLeastOnce()).close();

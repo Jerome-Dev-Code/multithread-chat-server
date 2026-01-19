@@ -29,9 +29,7 @@ class MainTest {
             System.setProperty("admin.port", "0");
             System.setProperty("log.verbose", "false");
 
-            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                Main.main(new String[]{});
-            });
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> Main.main(new String[]{}));
 
             try {
                 // On attend 1.5 seconde pour vérifier qu'aucune exception ne survient au boot

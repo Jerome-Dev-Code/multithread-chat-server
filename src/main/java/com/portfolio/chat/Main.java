@@ -69,7 +69,7 @@ public class Main {
             System.exit(1);
         } catch (Exception e) {
             // Capture toute autre erreur imprévue
-            System.err.println("\n[UNKNOWN ERROR] Une erreur inattendue est survenue : " + e.toString());
+            System.err.println("\n[UNKNOWN ERROR] Une erreur inattendue est survenue : " + e);
             e.printStackTrace();
             System.exit(1);
         }

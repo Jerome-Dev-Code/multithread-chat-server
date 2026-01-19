@@ -10,6 +10,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("unit")
 @DisplayName("Tests de l'API Admin (HTTP + Observer)")
@@ -50,7 +51,7 @@ class AdminStatusServerTest {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
         // 3. Vérifications
-        assertTrue(response.statusCode() == 200);
+        assertEquals(200, response.statusCode());
         assertTrue(response.body().contains("Total messages échangés depuis démarrage : 2"),
                 "Le compteur de l'API Admin devrait être à 2");
     }
