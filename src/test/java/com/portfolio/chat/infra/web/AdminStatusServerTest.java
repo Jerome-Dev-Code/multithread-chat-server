@@ -2,10 +2,7 @@ package com.portfolio.chat.infra.web;
 
 import com.portfolio.chat.core.MessageSender;
 import com.portfolio.chat.domain.ChatRoom;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,7 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
+@Tag("unit")
 @DisplayName("Tests de l'API Admin (HTTP + Observer)")
 class AdminStatusServerTest {
 

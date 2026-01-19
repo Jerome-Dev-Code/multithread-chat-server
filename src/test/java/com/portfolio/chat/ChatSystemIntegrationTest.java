@@ -14,7 +14,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
-
+@Tag("integration")
 @DisplayName("Tests d'Intégration - Système Complet")
 class ChatSystemIntegrationTest {
 

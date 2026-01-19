@@ -30,7 +30,11 @@ public class SocketServer {
                 threadPool.execute(new SocketClientHandler(client, chatRoom));
             }
         } catch (IOException e) {
-            if (!this.serverSocket.isClosed()) throw e;
+            // Si le socket est fermé volontairement (via stop()), on ne relance pas l'exception
+            // Sinon, c'est une erreur critique qu'on remonte au main
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                throw new IOException("SERVER_ACCEPT_ERROR: Failure while accepting client connection", e);
+            }
         }
         //stop();
     }
@@ -42,6 +46,10 @@ public class SocketServer {
             if (!threadPool.awaitTermination(1, TimeUnit.SECONDS)) {
                 threadPool.shutdownNow();
             }
-        } catch (IOException | InterruptedException ignored) {}
+        } catch (IOException | InterruptedException e) {
+            // On remonte une RuntimeException car stop() est souvent appelé dans des contextes
+            // où on ne peut pas gérer une exception vérifiée (ex: Shutdown Hook)
+            throw new RuntimeException("SERVER_STOP_ERROR: Failed to shutdown server cleanly", e);
+        }
     }
 }

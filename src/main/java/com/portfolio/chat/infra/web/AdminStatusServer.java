@@ -20,37 +20,50 @@ public class AdminStatusServer implements ChatObserver {
     }
 
     public int start(int port) throws IOException {
-        this.server = HttpServer.create(new InetSocketAddress(port), 0);
+        try{
+            this.server = HttpServer.create(new InetSocketAddress(port), 0);
 
-        this.server.createContext("/status", exchange -> {
-            var users = chatRoom.getOnlineUsers();
-            var responseString = String.format(
-                    "--- Chat Admin Dashboard ---\n" +
-                            "Utilisateurs en ligne : %d\n" +
-                            "Total messages échangés depuis démarrage : %d\n" +
-                            "Liste : %s",
-                    users.size(),
-                    totalMessagesServed.get(),
-                    String.join(", ", users)
-            );
-            // 1. Convertir d'abord en tableau d'octets UTF-8
-            byte[] responseBytes = responseString.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            this.server.createContext("/status", exchange -> {
+                try{
+                    var users = chatRoom.getOnlineUsers();
+                    var responseString = String.format(
+                            "--- Chat Admin Dashboard ---\n" +
+                                    "Utilisateurs en ligne : %d\n" +
+                                    "Total messages échangés depuis démarrage : %d\n" +
+                                    "Liste : %s",
+                            users.size(),
+                            totalMessagesServed.get(),
+                            String.join(", ", users)
+                    );
+                    // 1. Convertir d'abord en tableau d'octets UTF-8
+                    byte[] responseBytes = responseString.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-            // 2. Envoyer la taille réelle en OCTETS (pas en nombre de caractères)
-            exchange.sendResponseHeaders(200, responseBytes.length);
+                    // 2. Envoyer la taille réelle en OCTETS (pas en nombre de caractères)
+                    exchange.sendResponseHeaders(200, responseBytes.length);
 
-            // 3. Écrire et fermer proprement
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(responseBytes);
-                // Force l'envoi avant la fermeture
-                os.flush();
-            }
-        });
+                    // 3. Écrire et fermer proprement
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(responseBytes);
+                        // Force l'envoi avant la fermeture
+                        os.flush();
+                    }
+                }catch(IOException e){
+                    // On remonte l'exception au Thread parent (main) via le UncaughtExceptionHandler
+                    // car le callback de l'HttpServer s'exécute dans un thread séparé.
+                    throw new RuntimeException("ADMIN_API_REQUEST_ERROR: Failed to process /status request", e);
+                }
+            });
+            // Configurer l'exécuteur par défaut (null utilise l'exécuteur du serveur)
+            this.server.setExecutor(null);
+            this.server.start();
 
-        this.server.start();
-        System.out.println("[WEB] API Admin prête sur http://localhost:" + port + "/status");
-        return this.server.getAddress().getPort();
+            System.out.println("[WEB] API Admin prête sur http://localhost:" + port + "/status");
 
+            return this.server.getAddress().getPort();
+        }catch(IOException e){
+            // Erreur critique lors de la création du serveur (ex: Port déjà utilisé)
+            throw new IOException("ADMIN_API_START_ERROR: Could not bind to port " + port, e);
+        }
     }
 
     /**

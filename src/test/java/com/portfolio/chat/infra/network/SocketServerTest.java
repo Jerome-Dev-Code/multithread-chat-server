@@ -3,6 +3,7 @@ package com.portfolio.chat.infra.network;
 import com.portfolio.chat.domain.ChatRoom;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -15,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
+@Tag("unit")
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Tests du SocketServer (Intégration)")
 class SocketServerTest {

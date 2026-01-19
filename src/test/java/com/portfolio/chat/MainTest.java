@@ -2,11 +2,12 @@ package com.portfolio.chat;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-
+@Tag("smoke")
 @DisplayName("Smoke Test - Main")
 class MainTest {
 

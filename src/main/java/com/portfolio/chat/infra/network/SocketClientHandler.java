@@ -76,15 +76,23 @@ public class SocketClientHandler implements Runnable, MessageSender {
                     Thread.sleep(10);
                 }
             }
-        }catch (SocketException | EOFException e) {
-            //System.err.println("Client Error : " + e.getMessage());
-        } catch (IOException | InterruptedException e) {
-            if (connected) {
-                System.err.println("IO Error with " + username + ": " + e.getMessage());
+        }catch (SocketException e) {
+            if (connected && !socket.isClosed()) {
+                throw new RuntimeException("NETWORK_ERROR: " + e.getMessage(), e);
             }
-            //System.err.println("Client Error : " + e.getMessage());
+        } catch (EOFException e) {
+            // Remonte la fin de flux inattendue
+            throw new RuntimeException("STREAM_CLOSED_ERROR: Unexpected end of stream for " + username, e);
+        } catch (IOException e) {
+            // Remonte les autres erreurs d'E/S
+            throw new RuntimeException("IO_GENERAL_ERROR: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            // Remonte l'interruption du thread
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("THREAD_INTERRUPTED: " + e.getMessage(), e);
         } finally {
             disconnect();
+
         }
     }
 
@@ -94,12 +102,7 @@ public class SocketClientHandler implements Runnable, MessageSender {
             out.println(message);
         }
     }
-
-    @Override
-    public String getUsername() { return username; }
-
-    @Override
-    public synchronized void disconnect() {
+    private synchronized void disconnect(){
         if (!connected) {
             return;
         }
@@ -114,7 +117,7 @@ public class SocketClientHandler implements Runnable, MessageSender {
             if (socket != null && !socket.isClosed()) {
                 socket.close();
             }
-        } catch (IOException ignored) {
+        } catch (IOException e) {
 
         }
     }
