@@ -22,11 +22,10 @@ class ChatSystemIntegrationTest {
     private static AdminStatusServer adminServer;
     private static int chatPort;
     private static int adminPort;
-    private static ChatRoom chatRoom;
 
     @BeforeAll
     static void setup() throws IOException {
-        chatRoom = new ChatRoom();
+        var chatRoom = new ChatRoom();
         // 1. On trouve des ports libres AVANT de créer les serveurs
         chatPort = findFreePort();
         adminPort = findFreePort();
