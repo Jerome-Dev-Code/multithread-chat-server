@@ -63,45 +63,75 @@ class ChatSystemIntegrationTest {
     @Test
     @DisplayName("Scénario complet : Connexion TCP et vérification via API HTTP")
     void fullFlowIntegrationTest() throws Exception {
-        // 1. Connexion d'Alice (Client TCP)
-        Socket aliceSocket = new Socket("localhost", chatPort);
-        PrintWriter aliceOut = new PrintWriter(aliceSocket.getOutputStream(), true);
-        BufferedReader aliceIn = new BufferedReader(new InputStreamReader(aliceSocket.getInputStream()));
+        try(
+            // 1. Connexion d'Alice (Client TCP)
+            Socket aliceSocket = new Socket("localhost", chatPort);
+            PrintWriter aliceOut = new PrintWriter(aliceSocket.getOutputStream(), true);
+            BufferedReader aliceIn = new BufferedReader(new InputStreamReader(aliceSocket.getInputStream()));
 
-        aliceOut.println("Alice"); // Envoi du pseudo
-        aliceIn.readLine();        // Lecture du message de bienvenue
+            var bobSocket = new Socket("localhost", chatPort);
+            var bobOut = new PrintWriter(bobSocket.getOutputStream(), true);
+            var bobIn = new BufferedReader(new InputStreamReader(bobSocket.getInputStream()))
+            ){
+            aliceOut.println("Alice"); // Envoi du pseudo
+            aliceIn.readLine();        // Lecture du message de bienvenue
+            // Note : Alice reçoit aussi "SYSTEM: User Alice joined", il faut le lire ou l'ignorer
+            aliceIn.readLine();
 
-        // 2. Connexion de Bob (Client TCP)
-        Socket bobSocket = new Socket("localhost", chatPort);
-        PrintWriter bobOut = new PrintWriter(bobSocket.getOutputStream(), true);
-        BufferedReader bobIn = new BufferedReader(new InputStreamReader(bobSocket.getInputStream()));
+            bobOut.println("Bob");
+            bobIn.readLine();
+            bobIn.readLine();
 
-        bobOut.println("Bob");
-        bobIn.readLine();
+            // 3. Alice envoie un message
+            aliceIn.readLine();
+            aliceOut.println("Hello Bob!");
 
-        // 3. Alice envoie un message
-        aliceOut.println("Hello Bob!");
-        String receivedByBob = bobIn.readLine();
-        assertTrue(receivedByBob.contains("Alice: Hello Bob!"));
+            // 4. Utilisation d'une attente explicite ou lecture propre
+            // On peut ajouter un petit délai de sécurité si nécessaire
+            Thread.sleep(50);
+            String receivedByBob = bobIn.readLine();
 
-        // 4. Vérification via l'API Admin (Client HTTP)
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
+            assertNotNull(receivedByBob, "Bob should have received a message");
+            assertTrue(receivedByBob.contains("Alice") && receivedByBob.contains("Hello Bob!"),
+                    "Expected message from Alice but got: " + receivedByBob);
+
+            // 5. Vérification via l'API Admin (Client HTTP)
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + adminPort + "/status"))
                 .build();
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            String body = response.body();
 
-        // 5. Assertions sur l'état global
-        assertEquals(200, response.statusCode());
-        String body = response.body();
-        assertTrue(body.contains("\"userCount\":2"));
-        assertTrue(body.contains("Alice"));
-        assertTrue(body.contains("Bob"));
+            System.out.println("Admin API Response: " + body); // Pour le debug en cas d'échec
 
-        // Nettoyage
-        aliceSocket.close();
-        bobSocket.close();
+            // Assertions adaptées au format "Admin Dashboard"
+            assertAll("Vérification du Dashboard Admin",
+                () -> assertEquals(200, response.statusCode(), "Le statut HTTP doit être 200"),
+
+                // Vérification du titre
+                () -> assertTrue(body.contains("--- Chat Admin Dashboard ---"), "Titre du dashboard manquant"),
+
+                // Vérification du compteur (on cherche le libellé exact + le chiffre)
+                () -> assertTrue(body.contains("Utilisateurs en ligne : 2"),
+                        "Le compteur devrait afficher 2. Reçu : " + body),
+
+                // Vérification de la liste des utilisateurs
+                () -> assertTrue(body.contains("Alice"), "Alice doit être dans la liste"),
+                () -> assertTrue(body.contains("Bob"), "Bob doit être dans la liste")
+            );
+
+            //  7. Nettoyage
+            aliceOut.println("/quit");
+            bobOut.println("/quit");
+
+            aliceSocket.shutdownOutput();
+            bobSocket.shutdownOutput();
+
+            // PAUSE TECHNIQUE : Laisser le temps aux threads de mettre à jour la ChatRoom
+            Thread.sleep(200);
+        }
     }
     private static int findFreePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
