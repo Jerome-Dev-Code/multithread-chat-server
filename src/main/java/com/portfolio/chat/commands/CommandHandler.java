@@ -1,40 +1,34 @@
 package com.portfolio.chat.commands;
 
+import com.portfolio.chat.core.Command;
 import com.portfolio.chat.domain.ChatRoom;
+
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 
 public class CommandHandler {
-    private final Map<String, BiConsumer<String, ChatRoom>> commands;
+    private final Map<String, Command> commands = new HashMap<>();
 
-    public CommandHandler() {
-        commands = Map.of(
-                "/quit", (name, room) -> room.leave(name),
-                "/list", (name, room) -> {
-                    String list = "Connectés: " + String.join(", ", room.getOnlineUsers());
-                    // Logique pour envoyer au demandeur uniquement...
-                }
-        );
+    public void register(Command command) {
+        commands.put(command.getCommandName().toLowerCase(), command);
     }
 
-    public boolean handle(String input, String username, ChatRoom room) {
-        // Si ce n'est pas une commande, on laisse tomber tout de suite
-        if (!input.startsWith("/")) {
-            return false;
-        }
+    public boolean handle(String input) {
+        if (input == null || !input.startsWith("/")) return false;
 
-        // C'est une tentative de commande
-        var cmd = commands.get(input.split(" ")[0].toLowerCase());
+        var parts = input.split(" ");
+        var commandName = parts[0].toLowerCase();
 
-        if (cmd != null) {
-            cmd.accept(username, room);
-        } else {
-            // Optionnel : On pourrait envoyer un message d'erreur privé ici
-            System.out.println("[DEBUG] Commande inconnue tentée par " + username);
-        }
-
-        // On retourne true systématiquement car le message commençait par /
-        // et ne doit donc pas être traité comme un message de chat standard.
-        return true;
+        return Optional.ofNullable(commands.get(commandName))
+                .map(cmd -> {
+                    // Extraction des arguments (tout sauf le premier mot)
+                    var args = new String[parts.length - 1];
+                    System.arraycopy(parts, 1, args, 0, parts.length - 1);
+                    cmd.execute(args);
+                    return true;
+                })
+                .orElse(false);
     }
 }
