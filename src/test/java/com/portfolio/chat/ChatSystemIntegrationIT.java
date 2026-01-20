@@ -6,41 +6,39 @@ import com.portfolio.chat.infra.web.AdminStatusServer;
 import org.junit.jupiter.api.*;
 
 import java.io.*;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @Tag("integration")
-@DisplayName("Tests d'Intégration - Système Complet")
+@DisplayName("Tests d'Intégration - Système Complet (CI-Ready)")
 class ChatSystemIntegrationIT {
 
     private static SocketServer chatServer;
     private static AdminStatusServer adminServer;
-    private static int chatPort;
-    private static int adminPort;
+    private static int chatPort = 5000;
+    private static int adminPort = 8080;
 
     @BeforeAll
     static void setup() throws IOException {
         var chatRoom = new ChatRoom();
-        chatPort = findFreePort();
-        adminPort = findFreePort();
-
         adminServer = new AdminStatusServer(chatRoom);
         adminServer.start(adminPort);
 
         chatServer = new SocketServer(chatPort, chatRoom);
-        Thread serverThread = new Thread(() -> {
+        Thread t = new Thread(() -> {
             try { chatServer.start(); } catch (IOException ignored) {}
         });
-        serverThread.setDaemon(true);
-        serverThread.start();
+        t.setDaemon(true);
+        t.start();
 
-        try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+        // Pause plus longue pour la CI
+        try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
     }
 
     @AfterAll
@@ -50,75 +48,79 @@ class ChatSystemIntegrationIT {
     }
 
     @Test
-    @DisplayName("Scénario complet : Login, Commandes, Messaging et Admin API")
+    @DisplayName("Flux complet : Connexion, Commandes, Broadcast et Admin API")
     void fullFlowIntegrationTest() throws Exception {
+        String host = "127.0.0.1";
+
         try (
-                Socket aliceSocket = new Socket("localhost", chatPort);
+                Socket aliceSocket = new Socket(host, chatPort);
                 PrintWriter aliceOut = new PrintWriter(aliceSocket.getOutputStream(), true);
                 BufferedReader aliceIn = new BufferedReader(new InputStreamReader(aliceSocket.getInputStream()));
 
-                Socket bobSocket = new Socket("localhost", chatPort);
+                Socket bobSocket = new Socket(host, chatPort);
                 PrintWriter bobOut = new PrintWriter(bobSocket.getOutputStream(), true);
                 BufferedReader bobIn = new BufferedReader(new InputStreamReader(bobSocket.getInputStream()))
         ) {
-            // 1. PHASE DE CONNEXION (Synchronisée avec SocketClientHandler)
+            // --- 1. LOGIN ---
             assertEquals("Enter nickname :", aliceIn.readLine());
             aliceOut.println("Alice");
-
             assertEquals("Enter nickname :", bobIn.readLine());
             bobOut.println("Bob");
 
-            // On vide les messages système de bienvenue ("Alice joined", etc.)
-            Thread.sleep(100);
-            while(aliceIn.ready()) aliceIn.readLine();
-            while(bobIn.ready()) bobIn.readLine();
+            // Laisser le temps au serveur de processer les entrées
+            Thread.sleep(300);
 
-            // 2. TEST DU COMMAND PATTERN (/list)
+            // --- 2. TEST COMMANDE /list ---
             aliceOut.println("/list");
-            Thread.sleep(50); // Petit délai réseau simulé
 
-            boolean foundListHeader = false;
-            String line;
-            // On cherche le header défini dans ListCommand
-            while (aliceIn.ready() && (line = aliceIn.readLine()) != null) {
-                if (line.contains("Online Users (2)")) foundListHeader = true;
+            boolean listReceived = false;
+            // On attend max 2 secondes pour la réponse
+            long timeout = System.currentTimeMillis() + 2000;
+            while (System.currentTimeMillis() < timeout) {
+                if (aliceIn.ready()) {
+                    String line = aliceIn.readLine();
+                    if (line.contains("Online Users (2)")) {
+                        listReceived = true;
+                        break;
+                    }
+                }
+                Thread.sleep(50);
             }
-            assertTrue(foundListHeader, "Alice devrait pouvoir exécuter /list et voir 2 utilisateurs");
+            assertTrue(listReceived, "Alice devrait avoir reçu la liste des utilisateurs");
 
-            // 3. MESSAGERIE CLASSIQUE
+            // --- 3. TEST BROADCAST ---
             aliceOut.println("Hello Bob!");
-            Thread.sleep(100);
 
+            // Lecture bloquante pour Bob (plus fiable que ready() sur CI)
             String receivedByBob = bobIn.readLine();
-            assertNotNull(receivedByBob);
-            assertTrue(receivedByBob.contains("Alice: Hello Bob!"));
+            assertTrue(receivedByBob.contains("Alice: Hello Bob!"), "Bob n'a pas reçu le message d'Alice");
 
-            // 4. VÉRIFICATION API ADMIN (HTTP)
-            HttpClient client = HttpClient.newHttpClient();
+            // --- 4. VÉRIFICATION ADMIN API (HTTP) ---
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(2))
+                    .build();
+
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("http://localhost:" + adminPort + "/status"))
+                    .uri(URI.create("http://" + host + ":" + adminPort + "/status"))
+                    .GET()
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            assertAll("Vérification Admin",
+            assertAll("Vérification Admin Dashboard",
                     () -> assertEquals(200, response.statusCode()),
-                    () -> assertTrue(response.body().contains("Utilisateurs en ligne : 2")),
-                    () -> assertTrue(response.body().contains("Alice"))
+                    () -> assertTrue(response.body().contains("Utilisateurs en ligne : 2"), "Compteur faux"),
+                    () -> assertTrue(response.body().contains("Alice"), "Alice absente du dashboard"),
+                    () -> assertTrue(response.body().contains("Bob"), "Bob absent du dashboard")
             );
 
-            // 5. DÉCONNEXION PROPRE (Le fameux délai de 50ms)
+            // --- 5. DÉCONNEXION PROPRE ---
             aliceOut.println("/quit");
             bobOut.println("/quit");
 
-            // Délai pour laisser le flag 'connected' passer à false côté serveur
-            Thread.sleep(100);
-        }
-    }
-
-    private static int findFreePort() throws IOException {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
+            // Crucial : laisser le temps aux sockets de se fermer côté serveur
+            // AVANT de sortir du bloc try-with-resources du test
+            Thread.sleep(500);
         }
     }
 }
