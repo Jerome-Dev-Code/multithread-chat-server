@@ -42,11 +42,14 @@ class ChatSystemIntegrationIT {
             try {
                 chatServer.start();
             } catch (IOException ignored) {}
+        Thread t = new Thread(() -> {
+            try { chatServer.start(); } catch (IOException ignored) {}
         });
         serverThread.setDaemon(true);
         serverThread.start();
 
-        try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+        // Pause plus longue pour la CI
+        try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
     }
 
     @AfterAll
@@ -58,42 +61,45 @@ class ChatSystemIntegrationIT {
     @Test
     @DisplayName("Scénario complet : Login, Commandes, Messaging et Admin API")
     void fullFlowIntegrationTest() throws Exception {
-        try(
-            // 1. Connexion d'Alice (Client TCP)
-            Socket aliceSocket = new Socket("localhost", chatPort);
-            PrintWriter aliceOut = new PrintWriter(aliceSocket.getOutputStream(), true);
-            BufferedReader aliceIn = new BufferedReader(new InputStreamReader(aliceSocket.getInputStream()));
+        String host = "127.0.0.1";
 
-            var bobSocket = new Socket("localhost", chatPort);
-            var bobOut = new PrintWriter(bobSocket.getOutputStream(), true);
-            var bobIn = new BufferedReader(new InputStreamReader(bobSocket.getInputStream()))
-            ){
-            aliceOut.println("Alice"); // Envoi du pseudo
-            aliceIn.readLine();        // Lecture du message de bienvenue
-            // Note : Alice reçoit aussi "SYSTEM: User Alice joined", il faut le lire ou l'ignorer
-            aliceIn.readLine();
+        try (
+                Socket aliceSocket = new Socket(host, chatPort);
+                PrintWriter aliceOut = new PrintWriter(aliceSocket.getOutputStream(), true);
+                BufferedReader aliceIn = new BufferedReader(new InputStreamReader(aliceSocket.getInputStream()));
 
+                Socket bobSocket = new Socket(host, chatPort);
+                PrintWriter bobOut = new PrintWriter(bobSocket.getOutputStream(), true);
+                BufferedReader bobIn = new BufferedReader(new InputStreamReader(bobSocket.getInputStream()))
+        ) {
+            // --- 1. LOGIN ---
+            assertEquals("Enter nickname :", aliceIn.readLine());
+            aliceOut.println("Alice");
             assertEquals("Enter nickname :", bobIn.readLine());
             bobOut.println("Bob");
 
-            // On vide les messages système de bienvenue ("Alice joined", etc.)
-            Thread.sleep(100);
-            while(aliceIn.ready()) aliceIn.readLine();
-            while(bobIn.ready()) bobIn.readLine();
+            // Laisser le temps au serveur de processer les entrées
+            Thread.sleep(300);
 
-            // 2. TEST DU COMMAND PATTERN (/list)
+            // --- 2. TEST COMMANDE /list ---
             aliceOut.println("/list");
-            Thread.sleep(50); // Petit délai réseau simulé
 
-            boolean foundListHeader = false;
-            String line;
-            // On cherche le header défini dans ListCommand
-            while (aliceIn.ready() && (line = aliceIn.readLine()) != null) {
-                if (line.contains("Online Users (2)")) foundListHeader = true;
+            boolean listReceived = false;
+            // On attend max 2 secondes pour la réponse
+            long timeout = System.currentTimeMillis() + 2000;
+            while (System.currentTimeMillis() < timeout) {
+                if (aliceIn.ready()) {
+                    String line = aliceIn.readLine();
+                    if (line.contains("Online Users (2)")) {
+                        listReceived = true;
+                        break;
+                    }
+                }
+                Thread.sleep(50);
             }
-            assertTrue(foundListHeader, "Alice devrait pouvoir exécuter /list et voir 2 utilisateurs");
+            assertTrue(listReceived, "Alice devrait avoir reçu la liste des utilisateurs");
 
-            // 3. MESSAGERIE CLASSIQUE
+            // --- 3. TEST BROADCAST ---
             aliceOut.println("Hello Bob!");
             Thread.sleep(100);
 
@@ -115,8 +121,9 @@ class ChatSystemIntegrationIT {
             // 5. Vérification via l'API Admin (Client HTTP)
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:" + adminPort + "/status"))
-                .build();
+                    .uri(URI.create("http://" + host + ":" + adminPort + "/status"))
+                    .GET()
+                    .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             String body = response.body();
@@ -143,6 +150,9 @@ class ChatSystemIntegrationIT {
             aliceOut.println("/quit");
             bobOut.println("/quit");
 
+            // Crucial : laisser le temps aux sockets de se fermer côté serveur
+            // AVANT de sortir du bloc try-with-resources du test
+            Thread.sleep(500);
             // Délai pour laisser le flag 'connected' passer à false côté serveur
             Thread.sleep(100);
         }
