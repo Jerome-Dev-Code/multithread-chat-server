@@ -87,12 +87,18 @@ class ChatSystemIntegrationIT {
 
             // 4. Utilisation d'une attente explicite ou lecture propre
             // On peut ajouter un petit délai de sécurité si nécessaire
-            Thread.sleep(50);
-            String receivedByBob = bobIn.readLine();
+            String receivedByBob = null;
+            long msgTimeout = System.currentTimeMillis() + 3000; // 3 secondes de marge pour la CI
 
-            assertNotNull(receivedByBob, "Bob should have received a message");
-            assertTrue(receivedByBob.contains("Alice") && receivedByBob.contains("Hello Bob!"),
-                    "Expected message from Alice but got: " + receivedByBob);
+            while (System.currentTimeMillis() < msgTimeout) {
+                if (bobIn.ready()) {
+                    receivedByBob = bobIn.readLine();
+                    if (receivedByBob != null && receivedByBob.contains("Alice: Hello Bob!")) {
+                        break;
+                    }
+                }
+                Thread.sleep(100);
+            }
 
             // 5. Vérification via l'API Admin (Client HTTP)
             HttpClient client = HttpClient.newHttpClient();

@@ -84,8 +84,10 @@ public class SocketClientHandler implements Runnable, MessageSender {
             // Remonte la fin de flux inattendue
             throw new RuntimeException("STREAM_CLOSED_ERROR: Unexpected end of stream for " + username, e);
         } catch (IOException e) {
-            // Remonte les autres erreurs d'E/S
-            throw new RuntimeException("IO_GENERAL_ERROR: " + e.getMessage(), e);
+            if (connected) {
+                // Log seulement si on n'était pas en train de fermer volontairement
+                System.err.println("IO Error: " + e.getMessage());
+            }
         } catch (InterruptedException e) {
             // Remonte l'interruption du thread
             Thread.currentThread().interrupt();
