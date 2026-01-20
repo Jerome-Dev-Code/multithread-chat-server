@@ -1,5 +1,8 @@
 package com.portfolio.chat.infra.network;
 
+import com.portfolio.chat.commands.CommandHandler;
+import com.portfolio.chat.commands.ListCommand;
+import com.portfolio.chat.commands.QuitCommand;
 import com.portfolio.chat.core.MessageSender;
 import com.portfolio.chat.domain.ChatRoom;
 import java.io.*;
@@ -44,31 +47,19 @@ public class SocketClientHandler implements Runnable, MessageSender {
             this.username = inputName.trim();
             chatRoom.join(username, this);
 
+            var invoker = new CommandHandler();
+            invoker.register(new ListCommand(chatRoom, this));
+            invoker.register(new QuitCommand(this::disconnect));
+
             String input;
             while (connected && !socket.isClosed()) {
                 // On vérifie si une donnée est disponible avant de lire pour éviter le blocage fatal
                 if (socket.getInputStream().available() > 0 || in.ready()) {
                     input = in.readLine();
-                    if (input == null){
+                    if (input == null) {
                         break;
                     }
-
-                    if (input.equalsIgnoreCase("/quit")){
-                        break;
-                    }else if (input.equalsIgnoreCase("/list")) {
-                        // On récupère la liste des utilisateurs depuis la ChatRoom
-                        List<String> users = (List<String>) chatRoom.getOnlineUsers();
-                        if (users.isEmpty()) {
-                            sendMessage("La salle est vide.");
-                        } else {
-                            StringBuilder sb = new StringBuilder();
-                            sb.append("--- Utilisateurs en ligne (").append(users.size()).append(") ---\n");
-                            for (String user : users) {
-                                sb.append("- ").append(user).append("\n");
-                            }
-                            sendMessage(sb.toString());
-                        }
-                    }else {
+                    if (!invoker.handle(input)) {
                         chatRoom.broadcast(username, input);
                     }
                 } else {
@@ -76,7 +67,7 @@ public class SocketClientHandler implements Runnable, MessageSender {
                     Thread.sleep(10);
                 }
             }
-        }catch (SocketException e) {
+        } catch (SocketException e) {
             if (connected && !socket.isClosed()) {
                 throw new RuntimeException("NETWORK_ERROR: " + e.getMessage(), e);
             }
