@@ -140,7 +140,7 @@ class ChatSystemIntegrationIT {
                 () -> assertTrue(body.contains("Bob"), "Bob doit être dans la liste")
             );
 
-            //  7. Nettoyage
+            // 5. DÉCONNEXION PROPRE (Le fameux délai de 50ms)
             aliceOut.println("/quit");
             bobOut.println("/quit");
 
