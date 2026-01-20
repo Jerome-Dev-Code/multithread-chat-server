@@ -39,9 +39,6 @@ jobs:
           name: test-reports
           path: target/surefire-reports/
 
-      - name: 4 Vérifier la compilation (Build)
-        run: mvn clean package -DskipTests # On vérifie que le .jar se génère bien
-
       # On utilise 'package' au lieu de 'clean package' pour garder
       # les résultats des étapes précédentes si nécessaire.
       - name: 4. Vérifier la compilation (Build) et générer le package (JAR)
