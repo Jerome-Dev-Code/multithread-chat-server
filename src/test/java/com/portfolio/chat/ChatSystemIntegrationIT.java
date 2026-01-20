@@ -58,7 +58,7 @@ class ChatSystemIntegrationIT {
     }
 
     @Test
-    @DisplayName("Scénario complet : Connexion TCP et vérification via API HTTP")
+    @DisplayName("Scénario complet : Login, Commandes, Messaging et Admin API")
     void fullFlowIntegrationTest() throws Exception {
         String host = "127.0.0.1";
 
@@ -100,6 +100,7 @@ class ChatSystemIntegrationIT {
 
             // --- 3. TEST BROADCAST ---
             aliceOut.println("Hello Bob!");
+            Thread.sleep(100);
 
             // 4. Utilisation d'une attente explicite ou lecture propre
             // On peut ajouter un petit délai de sécurité si nécessaire
@@ -153,6 +154,7 @@ class ChatSystemIntegrationIT {
             Thread.sleep(500);
         }
     }
+
     private static int findFreePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             socket.setReuseAddress(true);
