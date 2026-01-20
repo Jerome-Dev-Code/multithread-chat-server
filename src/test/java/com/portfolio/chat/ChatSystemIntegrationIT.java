@@ -157,6 +157,7 @@ class ChatSystemIntegrationIT {
             Thread.sleep(500);
         }
     }
+
     private static int findFreePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             socket.setReuseAddress(true);
