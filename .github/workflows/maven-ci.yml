@@ -27,9 +27,9 @@ jobs:
       - name: 3.2 Exécuter les Smoke Tests
         run: mvn test -Dgroups="smoke" --batch-mode
 
+      # 'verify' lance failsafe et vérifie le respect des seuils
+      # On saute les tests unitaires déjà faits pour gagner du temps
       - name: 3.3 Exécuter les Tests d'Intégration
-        # 'verify' lance failsafe et vérifie le respect des seuils
-        # On saute les tests unitaires déjà faits pour gagner du temps
         run: mvn verify -Dgroups="integration" -DskipUnitTests=true --batch-mode
 
       - name: 3.4 Génération du rapport de test
@@ -41,3 +41,16 @@ jobs:
 
       - name: 4 Vérifier la compilation (Build)
         run: mvn clean package -DskipTests # On vérifie que le .jar se génère bien
+
+      # On utilise 'package' au lieu de 'clean package' pour garder
+      # les résultats des étapes précédentes si nécessaire.
+      - name: 4. Vérifier la compilation (Build) et générer le package (JAR)
+        run: mvn package -DskipTests --batch-mode
+
+      # Cette étape rend le JAR disponible dans l'interface GitHub
+      - name: 5. Téléverser l'artefact JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: tchat-server-executable  # Le chemin pointe vers le dossier target généré par Maven
+          path: target/*.jar
+          retention-days: 5  # Optionnel : supprime l'artefact après 5 jours pour gagner de la place
