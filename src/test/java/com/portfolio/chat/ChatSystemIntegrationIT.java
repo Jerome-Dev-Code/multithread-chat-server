@@ -98,6 +98,8 @@ class ChatSystemIntegrationIT {
             aliceOut.println("Hello Bob!");
             Thread.sleep(100);
 
+            // 4. Utilisation d'une attente explicite ou lecture propre
+            // On peut ajouter un petit délai de sécurité si nécessaire
             String receivedByBob = null;
             long msgTimeout = System.currentTimeMillis() + 3000; // 3 secondes de marge pour la CI
 
