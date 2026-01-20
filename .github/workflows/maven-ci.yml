@@ -21,8 +21,23 @@ jobs:
           distribution: 'temurin' # Distribution stable et recommandée
           cache: maven           # Accélère les builds futurs en cachant les dépendances
 
-      - name: 3. Exécuter les tests avec Maven
-        run: mvn test --batch-mode
+      - name: 3.1 Exécuter les Tests Unitaires
+        run: mvn test -Dgroups="unit" --batch-mode
 
-      - name: 4. Vérifier la compilation (Build)
+      - name: 3.2 Exécuter les Smoke Tests
+        run: mvn test -Dgroups="smoke" --batch-mode
+
+      - name: 3.3 Exécuter les Tests d'Intégration
+        # 'verify' lance failsafe et vérifie le respect des seuils
+        # On saute les tests unitaires déjà faits pour gagner du temps
+        run: mvn verify -Dgroups="integration" -DskipUnitTests=true --batch-mode
+
+      - name: 3.4 Génération du rapport de test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: target/surefire-reports/
+
+      - name: 4 Vérifier la compilation (Build)
         run: mvn clean package -DskipTests # On vérifie que le .jar se génère bien
