@@ -90,14 +90,18 @@ class SocketClientHandlerTest {
     }
 
     @Test
-    @DisplayName("Le handler doit fermer proprement le socket après une erreur fatale")
+    @DisplayName("Le handler doit fermer le socket même si une erreur survient au démarrage")
     void testSocketCloseOnException() throws IOException {
-        // Simulation d'une rupture de flux au milieu du run
-        when(this.mockSocket.getInputStream()).thenThrow(new IOException("Fatal crash"));
+        // GIVEN: Le socket lève une erreur dès la lecture du flux
+        when(this.mockSocket.getInputStream()).thenThrow(new IOException("Simulated network error"));
 
-        assertThrows(RuntimeException.class, () -> handler.run());
+        SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
 
-        // Vérifie que disconnect() a bien été appelé dans le 'finally'
+        // WHEN & THEN
+        // On s'attend toujours à une RuntimeException car connected est true au début
+        assertThrows(RuntimeException.class, handler::run);
+
+        // L'important est de vérifier que le socket est fermé dans le bloc finally
         verify(this.mockSocket, atLeastOnce()).close();
     }
 
