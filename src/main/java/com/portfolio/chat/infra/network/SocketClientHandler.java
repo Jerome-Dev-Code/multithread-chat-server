@@ -80,9 +80,8 @@ public class SocketClientHandler implements Runnable, MessageSender {
                 System.err.println("IO Error: " + e.getMessage());
             }
         } catch (InterruptedException e) {
-            // Remonte l'interruption du thread
+            // Fermeture normale. On ne lance plus de RuntimeException ici, on laisse le finally déconnecter
             Thread.currentThread().interrupt();
-            throw new RuntimeException("THREAD_INTERRUPTED: " + e.getMessage(), e);
         } finally {
             disconnect();
 

@@ -97,8 +97,6 @@ class ChatSystemIntegrationIT {
             // --- 3. TEST BROADCAST ---
             aliceOut.println("Hello Bob!");
 
-            // 4. Utilisation d'une attente explicite ou lecture propre
-            // On peut ajouter un petit délai de sécurité si nécessaire
             String receivedByBob = null;
             long msgTimeout = System.currentTimeMillis() + 3000; // 3 secondes de marge pour la CI
 
@@ -111,6 +109,13 @@ class ChatSystemIntegrationIT {
                 }
                 Thread.sleep(100);
             }
+            assertNotNull(receivedByBob, "Bob n'a absolument rien reçu");
+            assertTrue(receivedByBob.contains("Alice: Hello Bob!"), "Le message reçu par Bob est incorrect : " + receivedByBob);
+
+            // --- 4. VÉRIFICATION ADMIN API (HTTP) ---
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(2))
+                    .build();
 
             // 5. Vérification via l'API Admin (Client HTTP)
             HttpClient client = HttpClient.newHttpClient();
