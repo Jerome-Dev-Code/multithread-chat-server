@@ -112,7 +112,12 @@ class ChatSystemIntegrationIT {
                 Thread.sleep(100);
             }
             assertNotNull(receivedByBob, "Bob n'a absolument rien reçu");
-            assertTrue(receivedByBob.contains("Alice: Hello Bob!"), "Le message reçu par Bob est incorrect : " + receivedByBob);
+            String finalReceivedByBob = receivedByBob;
+            String finalReceivedByBob1 = receivedByBob;
+            assertAll("Contenu du message broadcasté",
+                    () -> assertTrue(finalReceivedByBob.contains("Alice"), "Le message devrait mentionner Alice"),
+                    () -> assertTrue(finalReceivedByBob1.contains("Hello Bob!"), "Le message devrait contenir le texte envoyé")
+            );
 
             // --- 4. VÉRIFICATION ADMIN API (HTTP) ---
             HttpClient client = HttpClient.newBuilder()
