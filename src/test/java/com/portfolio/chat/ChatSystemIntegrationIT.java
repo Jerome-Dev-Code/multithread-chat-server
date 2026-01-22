@@ -12,11 +12,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @Tag("integration")
-@DisplayName("Tests d'Intégration - Système Complet")
+@DisplayName("Tests d'Intégration - Système Complet (CI-Ready)")
 class ChatSystemIntegrationIT {
 
     private static SocketServer chatServer;
@@ -36,17 +37,11 @@ class ChatSystemIntegrationIT {
         adminServer.start(adminPort);
 
         chatServer = new SocketServer(chatPort, chatRoom);
-
-        // Lancement du serveur de chat dans un thread séparé
-        Thread serverThread = new Thread(() -> {
-            try {
-                chatServer.start();
-            } catch (IOException ignored) {}
         Thread t = new Thread(() -> {
             try { chatServer.start(); } catch (IOException ignored) {}
         });
-        serverThread.setDaemon(true);
-        serverThread.start();
+        t.setDaemon(true);
+        t.start();
 
         // Pause plus longue pour la CI
         try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
@@ -153,11 +148,8 @@ class ChatSystemIntegrationIT {
             // Crucial : laisser le temps aux sockets de se fermer côté serveur
             // AVANT de sortir du bloc try-with-resources du test
             Thread.sleep(500);
-            // Délai pour laisser le flag 'connected' passer à false côté serveur
-            Thread.sleep(100);
         }
     }
-
     private static int findFreePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             socket.setReuseAddress(true);
