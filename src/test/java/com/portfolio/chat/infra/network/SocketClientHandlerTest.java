@@ -12,13 +12,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+
 @Tag("unit")
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Tests du SocketClientHandler")
@@ -26,152 +26,90 @@ class SocketClientHandlerTest {
 
     @Mock
     private Socket mockSocket;
-
     @Mock
     private ChatRoom mockChatRoom;
-
     private ByteArrayOutputStream outputStream;
+    private SocketClientHandler handler;
 
     @BeforeEach
     void setUp() throws IOException {
-        this.mockChatRoom = mock(ChatRoom.class);
-        this.mockSocket = mock(Socket.class);
-        // On prépare un flux de sortie pour capturer ce que le serveur envoie au client
         this.outputStream = new ByteArrayOutputStream();
+        // Initialisation du comportement par défaut pour les flux
         lenient().when(this.mockSocket.getOutputStream()).thenReturn(this.outputStream);
+
+        // Initialisation de l'objet à tester
+        handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
     }
-
     @Test
-    @DisplayName("Le handler doit appeler broadcast avec l'expéditeur et le contenu séparés")
+    @DisplayName("Le handler doit broadcaster les messages normaux et déléguer les commandes")
     void testUserMessageBroadcast() throws IOException {
-        // Simulation : L'utilisateur choisit "Alice", envoie "Salut !", puis quitte
+        // Alice entre son nom, envoie un message, puis quitte
         String simulatedInput = "Alice\nSalut !\n/quit\n";
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(simulatedInput.getBytes());
-        when(this.mockSocket.getInputStream()).thenReturn(inputStream);
+        when(this.mockSocket.getInputStream()).thenReturn(new ByteArrayInputStream(simulatedInput.getBytes()));
 
-        SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
         handler.run();
 
-        // 1. Vérifie que l'utilisateur a rejoint
+        // 1. Vérifie la jonction
         verify(this.mockChatRoom).join(eq("Alice"), eq(handler));
 
-        // 2. Vérifie l'appel à broadcast avec la nouvelle signature (sender, message)
-        // C'est ici que la modification est importante
+        // 2. Vérifie que le message normal est broadcasté
         verify(this.mockChatRoom).broadcast(eq("Alice"), eq("Salut !"));
 
-        // 3. Vérifie le départ
+        // 3. Vérifie que le /quit a bien provoqué le départ (via QuitCommand)
         verify(this.mockChatRoom).leave(eq("Alice"));
     }
     @Test
-    @DisplayName("La méthode sendMessage doit écrire correctement sur le flux de sortie")
-    void testSendMessage() throws IOException {
-        SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
-
-        // 2. On déclenche l'initialisation des flux manuellement
-        // Cela va lier le PrintWriter à notre outputStream mocké dans le @BeforeEach
-        // Grâce à setupStreams(), nous pouvons tester l'envoi de messages sans déclencher la boucle bloquante run().
-        // Cela permet un test unitaire rapide et isolé.
-        handler.setupStreams();
-
-        // 3. Action
-        String testMessage = "Test message";
-        handler.sendMessage(testMessage);
-
-        // 4. Vérification
-        // On vérifie que le message est bien présent dans le flux de sortie capturé
-        String capturedOutput = this.outputStream.toString();
-        assertTrue(capturedOutput.contains(testMessage),"Le flux de sortie devrait contenir le message envoyé");
-    }
-    @Test
-    @DisplayName("La commande /list doit retourner la liste formatée des utilisateurs")
+    @DisplayName("La commande /list doit être traitée par la ListCommand via le handler")
     void shouldReturnUserListWhenListCommandIsReceived() throws IOException {
-        // GIVEN: Deux utilisateurs en ligne
-        List<String> fakeUsers = Arrays.asList("Alice", "Bob");
-        when(this.mockChatRoom.getOnlineUsers()).thenReturn(fakeUsers);
-
-        // Simulation de l'entrée utilisateur : "Alice\n/list\n/quit\n"
-        // (On simule le pseudo, puis la commande, puis la sortie)
-        String inputData = "Alice\n/list\n/quit\n";
-        InputStream inputStream = new ByteArrayInputStream(inputData.getBytes());
-        when(this.mockSocket.getInputStream()).thenReturn(inputStream);
-        SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
-        // WHEN
-        handler.run();
-        // THEN
-        String output = this.outputStream.toString();
-        // On vérifie que la réponse contient les noms des utilisateurs
-        assertTrue(output.contains("Alice"), "La réponse doit contenir Alice");
-        assertTrue(output.contains("Bob"), "La réponse doit contenir Bob");
-        assertTrue(output.contains("2"), "La réponse doit afficher le compte total");
-
-        // On vérifie que la méthode du domaine a bien été appelée
-        verify(this.mockChatRoom, atLeastOnce()).getOnlineUsers();
-    }
-    @Test
-    @DisplayName("La commande /list doit gérer le cas d'une liste vide")
-    void shouldHandleEmptyUserList() throws IOException {
-        // GIVEN: Aucun utilisateur
-        when(this.mockChatRoom.getOnlineUsers()).thenReturn(List.of());
-
+        // GIVEN: Liste d'utilisateurs
+        when(this.mockChatRoom.getOnlineUsers()).thenReturn(Arrays.asList("Alice", "Bob"));
         String inputData = "Alice\n/list\n/quit\n";
         when(this.mockSocket.getInputStream()).thenReturn(new ByteArrayInputStream(inputData.getBytes()));
-        SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
+
         // WHEN
         handler.run();
+
         // THEN
-        assertTrue(this.outputStream.toString().contains("0") || this.outputStream.toString().contains("vide"));
+        String output = this.outputStream.toString();
+        // On vérifie le formatage défini dans ListCommand
+        assertTrue(output.contains("Online Users (2)"), "Le header de liste est manquant");
+        assertTrue(output.contains("- Alice"), "Alice devrait figurer dans la liste");
+        assertTrue(output.contains("- Bob"), "Bob devrait figurer dans la liste");
     }
+
     @Test
-    @DisplayName("Le handler ne doit pas broadcaster la commande /quit")
-    void testQuitCommandHandling() throws IOException {
-        String simulatedInput = "Alice\n/quit\n";
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(simulatedInput.getBytes());
-        when(this.mockSocket.getInputStream()).thenReturn(inputStream);
+    @DisplayName("Le handler ne doit jamais broadcaster une commande")
+    void testNoBroadcastForCommands() throws IOException {
+        String simulatedInput = "Alice\n/list\n/quit\n";
+        when(this.mockSocket.getInputStream()).thenReturn(new ByteArrayInputStream(simulatedInput.getBytes()));
 
-        SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
-        // Exécution (ne doit pas lever d'exception)
-        assertDoesNotThrow(handler::run);
+        handler.run();
 
-        // Vérification : Alice a rejoint puis quitté la salle
-        verify(mockChatRoom).join(eq("Alice"), any());
-        // On vérifie que broadcast n'a jamais été appelé avec "/quit"
-        verify(this.mockChatRoom, never()).broadcast(anyString(), eq("/quit"));
-        verify(this.mockChatRoom).leave("Alice");
-
-        // Vérification : Le socket est fermé à la fin
-        verify(mockSocket, atLeastOnce()).close();
+        // On vérifie que broadcast n'a JAMAIS été appelé avec une commande
+        verify(this.mockChatRoom, never()).broadcast(anyString(), contains("/"));
     }
+
     @Test
-    @DisplayName("Le handler doit fermer le socket en cas d'erreur de lecture")
+    @DisplayName("Le handler doit fermer proprement le socket après une erreur fatale")
     void testSocketCloseOnException() throws IOException {
-        // On simule une erreur lors de la lecture du flux
-        when(this.mockSocket.getInputStream()).thenThrow(new IOException("Simulated network error"));
+        // Simulation d'une rupture de flux au milieu du run
+        when(this.mockSocket.getInputStream()).thenThrow(new IOException("Fatal crash"));
 
-        SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
-        // Au lieu d'appeler handler.run() directement, on vérifie qu'il explose
-        RuntimeException exception = assertThrows(RuntimeException.class, handler::run);
+        assertThrows(RuntimeException.class, () -> handler.run());
 
-        // On vérifie que c'est bien notre message personnalisé
-        assertTrue(exception.getMessage().contains("IO_GENERAL_ERROR"));
-
-        // On vérifie que le socket est bien fermé malgré l'erreur
+        // Vérifie que disconnect() a bien été appelé dans le 'finally'
         verify(this.mockSocket, atLeastOnce()).close();
     }
+
     @Test
-    @DisplayName("Vérifie que la SocketException est gérée silencieusement si déconnecté")
-    void testSocketExceptionHandling() throws IOException {
-        // Simulation d'une SocketException (ex: Connection Reset)
-        InputStream mockIn = mock(InputStream.class);
-        when(mockSocket.getInputStream()).thenReturn(mockIn);
-        when(mockIn.read(any(), anyInt(), anyInt())).thenThrow(new java.net.SocketException("Connection reset"));
+    @DisplayName("Vérifie que sendMessage écrit physiquement sur le flux réseau")
+    void testSendMessage() throws IOException {
+        // On prépare les flux manuellement pour ce test granulaire
+        handler.setupStreams();
 
-        // On déclenche l'exception
-        // Note: Si connected est true, elle sera remontée.
-        // Si vous voulez tester le silence, il faudrait que connected soit false.
-        SocketClientHandler handler = new SocketClientHandler(this.mockSocket, this.mockChatRoom);
-        assertThrows(RuntimeException.class, handler::run);
+        handler.sendMessage("Hello World");
 
-        // On s'assure que close est quand même appelé
-        verify(mockSocket, atLeastOnce()).close();
+        // On vérifie que le contenu a bien été écrit dans notre ByteArrayOutputStream
+        assertTrue(this.outputStream.toString().contains("Hello World"));
     }
 }

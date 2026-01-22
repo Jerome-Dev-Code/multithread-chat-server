@@ -14,6 +14,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
+
 @Tag("integration")
 @DisplayName("Tests d'Intégration - Système Complet")
 class ChatSystemIntegrationIT {
@@ -45,12 +46,7 @@ class ChatSystemIntegrationIT {
         serverThread.setDaemon(true);
         serverThread.start();
 
-        // On laisse un court instant pour le démarrage
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e){
-            e.printStackTrace();
-        }
+        try { Thread.sleep(500); } catch (InterruptedException ignored) {}
     }
 
     @AfterAll
@@ -60,7 +56,7 @@ class ChatSystemIntegrationIT {
     }
 
     @Test
-    @DisplayName("Scénario complet : Connexion TCP et vérification via API HTTP")
+    @DisplayName("Scénario complet : Login, Commandes, Messaging et Admin API")
     void fullFlowIntegrationTest() throws Exception {
         try(
             // 1. Connexion d'Alice (Client TCP)
@@ -77,13 +73,29 @@ class ChatSystemIntegrationIT {
             // Note : Alice reçoit aussi "SYSTEM: User Alice joined", il faut le lire ou l'ignorer
             aliceIn.readLine();
 
+            assertEquals("Enter nickname :", bobIn.readLine());
             bobOut.println("Bob");
-            bobIn.readLine();
-            bobIn.readLine();
 
-            // 3. Alice envoie un message
-            aliceIn.readLine();
+            // On vide les messages système de bienvenue ("Alice joined", etc.)
+            Thread.sleep(100);
+            while(aliceIn.ready()) aliceIn.readLine();
+            while(bobIn.ready()) bobIn.readLine();
+
+            // 2. TEST DU COMMAND PATTERN (/list)
+            aliceOut.println("/list");
+            Thread.sleep(50); // Petit délai réseau simulé
+
+            boolean foundListHeader = false;
+            String line;
+            // On cherche le header défini dans ListCommand
+            while (aliceIn.ready() && (line = aliceIn.readLine()) != null) {
+                if (line.contains("Online Users (2)")) foundListHeader = true;
+            }
+            assertTrue(foundListHeader, "Alice devrait pouvoir exécuter /list et voir 2 utilisateurs");
+
+            // 3. MESSAGERIE CLASSIQUE
             aliceOut.println("Hello Bob!");
+            Thread.sleep(100);
 
             // 4. Utilisation d'une attente explicite ou lecture propre
             // On peut ajouter un petit délai de sécurité si nécessaire
@@ -127,17 +139,15 @@ class ChatSystemIntegrationIT {
                 () -> assertTrue(body.contains("Bob"), "Bob doit être dans la liste")
             );
 
-            //  7. Nettoyage
+            // 5. DÉCONNEXION PROPRE (Le fameux délai de 50ms)
             aliceOut.println("/quit");
             bobOut.println("/quit");
 
-            aliceSocket.shutdownOutput();
-            bobSocket.shutdownOutput();
-
-            // PAUSE TECHNIQUE : Laisser le temps aux threads de mettre à jour la ChatRoom
-            Thread.sleep(200);
+            // Délai pour laisser le flag 'connected' passer à false côté serveur
+            Thread.sleep(100);
         }
     }
+
     private static int findFreePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             socket.setReuseAddress(true);
