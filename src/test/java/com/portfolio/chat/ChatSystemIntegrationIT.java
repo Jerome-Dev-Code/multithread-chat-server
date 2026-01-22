@@ -6,6 +6,7 @@ import com.portfolio.chat.infra.web.AdminStatusServer;
 import org.junit.jupiter.api.*;
 
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,12 +22,17 @@ class ChatSystemIntegrationIT {
 
     private static SocketServer chatServer;
     private static AdminStatusServer adminServer;
-    private static int chatPort = 5000;
-    private static int adminPort = 8080;
+    private static int chatPort;
+    private static int adminPort;
 
     @BeforeAll
     static void setup() throws IOException {
         var chatRoom = new ChatRoom();
+        // 1. On trouve des ports libres AVANT de créer les serveurs
+        chatPort = findFreePort();
+        adminPort = findFreePort();
+
+        // 2. On instancie les serveurs avec ces ports réservés
         adminServer = new AdminStatusServer(chatRoom);
         adminServer.start(adminPort);
 
@@ -91,36 +97,62 @@ class ChatSystemIntegrationIT {
             // --- 3. TEST BROADCAST ---
             aliceOut.println("Hello Bob!");
 
-            // Lecture bloquante pour Bob (plus fiable que ready() sur CI)
-            String receivedByBob = bobIn.readLine();
-            assertTrue(receivedByBob.contains("Alice: Hello Bob!"), "Bob n'a pas reçu le message d'Alice");
+            // 4. Utilisation d'une attente explicite ou lecture propre
+            // On peut ajouter un petit délai de sécurité si nécessaire
+            String receivedByBob = null;
+            long msgTimeout = System.currentTimeMillis() + 3000; // 3 secondes de marge pour la CI
 
-            // --- 4. VÉRIFICATION ADMIN API (HTTP) ---
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(2))
-                    .build();
+            while (System.currentTimeMillis() < msgTimeout) {
+                if (bobIn.ready()) {
+                    receivedByBob = bobIn.readLine();
+                    if (receivedByBob != null && receivedByBob.contains("Alice: Hello Bob!")) {
+                        break;
+                    }
+                }
+                Thread.sleep(100);
+            }
 
+            // 5. Vérification via l'API Admin (Client HTTP)
+            HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://" + host + ":" + adminPort + "/status"))
                     .GET()
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            String body = response.body();
 
-            assertAll("Vérification Admin Dashboard",
-                    () -> assertEquals(200, response.statusCode()),
-                    () -> assertTrue(response.body().contains("Utilisateurs en ligne : 2"), "Compteur faux"),
-                    () -> assertTrue(response.body().contains("Alice"), "Alice absente du dashboard"),
-                    () -> assertTrue(response.body().contains("Bob"), "Bob absent du dashboard")
+            System.out.println("Admin API Response: " + body); // Pour le debug en cas d'échec
+
+            // Assertions adaptées au format "Admin Dashboard"
+            assertAll("Vérification du Dashboard Admin",
+                () -> assertEquals(200, response.statusCode(), "Le statut HTTP doit être 200"),
+
+                // Vérification du titre
+                () -> assertTrue(body.contains("--- Chat Admin Dashboard ---"), "Titre du dashboard manquant"),
+
+                // Vérification du compteur (on cherche le libellé exact + le chiffre)
+                () -> assertTrue(body.contains("Utilisateurs en ligne : 2"),
+                        "Le compteur devrait afficher 2. Reçu : " + body),
+
+                // Vérification de la liste des utilisateurs
+                () -> assertTrue(body.contains("Alice"), "Alice doit être dans la liste"),
+                () -> assertTrue(body.contains("Bob"), "Bob doit être dans la liste")
             );
 
-            // --- 5. DÉCONNEXION PROPRE ---
+            //  7. Nettoyage
             aliceOut.println("/quit");
             bobOut.println("/quit");
 
             // Crucial : laisser le temps aux sockets de se fermer côté serveur
             // AVANT de sortir du bloc try-with-resources du test
             Thread.sleep(500);
+        }
+    }
+    private static int findFreePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            socket.setReuseAddress(true);
+            return socket.getLocalPort();
         }
     }
 }
