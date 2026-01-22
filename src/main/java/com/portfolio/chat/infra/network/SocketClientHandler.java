@@ -74,14 +74,14 @@ public class SocketClientHandler implements Runnable, MessageSender {
         } catch (EOFException e) {
             // Remonte la fin de flux inattendue
             throw new RuntimeException("STREAM_CLOSED_ERROR: Unexpected end of stream for " + username, e);
-        } catch (IOException e) {
-            if (connected) {
-                // Log seulement si on n'était pas en train de fermer volontairement
-                System.err.println("IO Error: " + e.getMessage());
-            }
         } catch (InterruptedException e) {
             // Fermeture normale. On ne lance plus de RuntimeException ici, on laisse le finally déconnecter
             Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            if (connected) {
+                // Si on est toujours marqué comme "connecté", c'est une vraie erreur imprévue
+                throw new RuntimeException("IO_GENERAL_ERROR: " + e.getMessage(), e);
+            }
         } finally {
             disconnect();
 
