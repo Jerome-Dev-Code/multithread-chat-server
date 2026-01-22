@@ -15,9 +15,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
-
 @Tag("integration")
-@DisplayName("Tests d'Intégration - Système Complet (CI-Ready)")
+@DisplayName("Tests d'Intégration - Système Complet")
 class ChatSystemIntegrationIT {
 
     private static SocketServer chatServer;
