@@ -121,7 +121,6 @@ class ChatSystemIntegrationIT {
                     .build();
 
             // 5. Vérification via l'API Admin (Client HTTP)
-            HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://" + host + ":" + adminPort + "/status"))
                     .GET()
